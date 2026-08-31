@@ -1,0 +1,16 @@
+{"timestamp":24818984,"category":"session_restore","name":"backup_can_be_loaded_session_file","extra":{"glean_timestamp":"1788101050450","loadfail_reason":"N/A","path_key":"clean","can_load":"true"}}
+{"timestamp":24818984,"category":"session_restore","name":"backup_can_be_loaded_session_file","extra":{"can_load":"true","glean_timestamp":"1788101050450","path_key":"clean","loadfail_reason":"N/A"}}
+{"timestamp":24818984,"category":"session_restore","name":"shutdown_success_session_startup","extra":{"shutdown_reason":"N/A","shutdown_ok":"false","glean_timestamp":"1788101050450"}}
+{"timestamp":24819705,"category":"jsonfile","name":"load_logins","extra":{"value":"error_notfounderror","glean_timestamp":"1788101051171"}}
+{"timestamp":24819754,"category":"nimbus_events","name":"startup_database_consistency","extra":{"primary":"database","glean_timestamp":"1788101051221","store_active_count":"27","total_db_count":"27","trigger":"startup","total_store_count":"27","db_active_count":"27"}}
+{"timestamp":24819787,"category":"jsonfile","name":"load_autofillprofiles","extra":{"glean_timestamp":"1788101051253","value":"error_notfounderror"}}
+{"timestamp":24819815,"category":"containers","name":"container_profile_loaded","extra":{"glean_timestamp":"1788101051281","containers":"4"}}
+{"timestamp":24819892,"category":"upgrade_dialog","name":"trigger_reason","extra":{"value":"not-major","glean_timestamp":"1788101051358"}}
+{"timestamp":24819901,"category":"normandy","name":"unenroll_nimbus_experiment","extra":{"value":"hnt-wattle-ncm-non-eu-4-widgets-rollout-jul-23","branch":"widgets-large","glean_timestamp":"1788101051367","reason":"targeting-mismatch"}}
+{"timestamp":24819901,"category":"nimbus_events","name":"unenrollment","extra":{"reason":"targeting-mismatch","branch":"widgets-large","glean_timestamp":"1788101051367","experiment":"hnt-wattle-ncm-non-eu-4-widgets-rollout-jul-23"}}
+{"timestamp":24820007,"category":"normandy","name":"enroll_nimbus_experiment","extra":{"branch":"widgets-potd","value":"hnt-wattle-ncm-potd-widget-rollout-v2","experimentType":"rollout","glean_timestamp":"1788101051474"}}
+{"timestamp":24820007,"category":"nimbus_events","name":"enrollment","extra":{"glean_timestamp":"1788101051474","branch":"widgets-potd","experiment_type":"rollout","experiment":"hnt-wattle-ncm-potd-widget-rollout-v2"}}
+{"timestamp":24820022,"category":"nimbus_events","name":"is_ready","extra":{"glean_timestamp":"1788101051488"}}
+{"timestamp":24821413,"category":"nimbus_events","name":"database_write","extra":{"success":"true","glean_timestamp":"1788101052879"}}
+{"timestamp":24825218,"category":"normandy","name":"expose_nimbus_experiment","extra":{"value":"new-tab-155120260811195042-to-release-only-153","featureId":"newtabTrainhopAddon","glean_timestamp":"1788101056685","branchSlug":"rollout"}}
+{"timestamp":24825218,"category":"nimbus_events","name":"exposure","extra":{"feature_id":"newtabTrainhopAddon","glean_timestamp":"1788101056685","experiment":"new-tab-155120260811195042-to-release-only-153","branch":"rollout"}}

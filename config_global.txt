@@ -1,0 +1,13 @@
+# ============================================================
+# CONFIGURACIÓN GLOBAL - LOCALIZADOR DE AMIGOS
+# ============================================================
+
+[NAVEGADOR]
+navegador = firefox
+carpeta_perfil_custom = perfiles/localizador_amigos
+
+[BUSQUEDA]
+tiempo_espera_busqueda_segundos = 5
+
+[LIMITES]
+tiempo_minimo_entre_envios_segundos = 10

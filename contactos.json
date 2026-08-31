@@ -1,0 +1,12 @@
+{
+  "contactos": [
+    {
+      "nombre": "Agustin",
+      "mensaje": "mensaje-001.txt"
+    },
+    {
+      "nombre": "Alberto",
+      "mensaje": "mensaje-001.txt"
+    }
+  ]
+}
