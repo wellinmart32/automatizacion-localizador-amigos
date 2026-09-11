@@ -27,6 +27,7 @@ def leer_config_global():
         'carpeta_perfil_custom': 'perfiles/localizador_amigos',
         'tiempo_espera_busqueda_segundos': '5',
         'tiempo_minimo_entre_envios_segundos': '10',
+        'cantidad_resultados_intentar': '1',
         'carpeta_contactos': 'contactos.json',
         'carpeta_mensajes': 'mensajes'
     }
@@ -45,6 +46,7 @@ def leer_config_global():
 
     if config.has_section('BUSQUEDA'):
         resultado['tiempo_espera_busqueda_segundos'] = config.get('BUSQUEDA', 'tiempo_espera_busqueda_segundos', fallback=resultado['tiempo_espera_busqueda_segundos'])
+        resultado['cantidad_resultados_intentar'] = config.get('BUSQUEDA', 'cantidad_resultados_intentar', fallback=resultado['cantidad_resultados_intentar'])
 
     if config.has_section('LIMITES'):
         resultado['tiempo_minimo_entre_envios_segundos'] = config.get('LIMITES', 'tiempo_minimo_entre_envios_segundos', fallback=resultado['tiempo_minimo_entre_envios_segundos'])

@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import pyperclip
+from urllib.parse import quote
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -59,95 +60,82 @@ class LocalizadorFacebook:
         print(f"   {V}✅ Navegador iniciado{X}")
 
     def verificar_sesion(self):
-        """Abre Facebook y verifica si hay una sesión activa"""
+        """Abre Facebook y verifica sesión activa mediante la URL actual (más estable que selectores de DOM)"""
         print(f"\n{N}🔐 Verificando sesión de Facebook...{X}")
         self.driver.get("https://www.facebook.com")
         time.sleep(4)
 
-        try:
-            self.driver.find_element(By.XPATH, "//div[@aria-label='Buscar en Facebook' or @aria-label='Search Facebook']")
-            print(f"   {V}✅ Ya tienes sesión activa en Facebook{X}")
-            return True
-        except NoSuchElementException:
-            print(f"   {A}⚠️  No se detectó sesión activa. Inicia sesión manualmente en la ventana abierta.{X}")
-            print(f"   {A}   Esperando hasta 60s...{X}")
-            for _ in range(12):
-                time.sleep(5)
-                try:
-                    self.driver.find_element(By.XPATH, "//div[@aria-label='Buscar en Facebook' or @aria-label='Search Facebook']")
-                    print(f"   {V}✅ Sesión detectada{X}")
-                    return True
-                except NoSuchElementException:
-                    continue
-            print(f"   {R}❌ No se detectó inicio de sesión a tiempo{X}")
-            return False
+        if self._es_pagina_seguridad():
+            print(f"\n{A}{N}⚠️  FACEBOOK REQUIERE VERIFICACIÓN DE SEGURIDAD{X}")
+            print(f"{A}Por favor resuelve el puzzle en el navegador. Tienes 3 minutos.{X}\n")
+            return self._esperar_resolucion(timeout=180)
+
+        url_actual = self.driver.current_url
+        if 'login' in url_actual:
+            print(f"\n{A}{N}⚠️  NO HAS INICIADO SESIÓN EN FACEBOOK{X}")
+            print(f"{A}Por favor inicia sesión en el navegador. Tienes 2 minutos.{X}\n")
+            return self._esperar_resolucion(timeout=120)
+
+        print(f"   {V}✅ Ya tienes sesión activa en Facebook{X}")
+        return True
+
+    def _es_pagina_seguridad(self):
+        """Detecta si Facebook mostró una página de verificación de seguridad"""
+        url_actual = self.driver.current_url
+        urls_seguridad = [
+            'two_step_verification', 'checkpoint', 'login/device-based',
+            'security_check', 'identity_confirmation', 'recaptcha', 'captcha'
+        ]
+        return any(p in url_actual for p in urls_seguridad)
+
+    def _esperar_resolucion(self, timeout=180):
+        """Espera a que el usuario inicie sesión o resuelva la verificación de seguridad"""
+        tiempo_transcurrido = 0
+        while tiempo_transcurrido < timeout:
+            time.sleep(5)
+            tiempo_transcurrido += 5
+            url_actual = self.driver.current_url
+            if not self._es_pagina_seguridad() and 'login' not in url_actual and 'facebook.com' in url_actual:
+                print(f"   {V}✅ Sesión detectada{X}")
+                time.sleep(3)
+                return True
+            restantes = timeout - tiempo_transcurrido
+            print(f"   ⏳ Esperando... ({restantes}s restantes)")
+        print(f"   {R}❌ Tiempo de espera agotado{X}")
+        return False
 
     # ==================== BÚSQUEDA ====================
 
-    def _encontrar_barra_busqueda(self, timeout=10):
-        """Selector en cascada para la barra de búsqueda de Facebook"""
-        selectores = [
-            "//div[@aria-label='Buscar en Facebook']",
-            "//div[@aria-label='Search Facebook']",
-            "//input[@aria-label='Buscar en Facebook']",
-            "//input[@aria-label='Search Facebook']",
-            "//input[@placeholder='Buscar en Facebook']",
-        ]
-        for selector in selectores:
-            try:
-                elemento = WebDriverWait(self.driver, timeout).until(
-                    EC.presence_of_element_located((By.XPATH, selector))
-                )
-                return elemento
-            except TimeoutException:
-                continue
-        return None
-
     def buscar_persona(self, nombre):
-        """Escribe el nombre en la barra de búsqueda de Facebook"""
+        """Navega directo a la página de resultados de búsqueda de personas (más estable que el dropdown en vivo)"""
         print(f"\n🔍 Buscando: '{nombre}'")
 
-        barra_busqueda = self._encontrar_barra_busqueda()
-        if not barra_busqueda:
-            print(f"   {R}❌ No se encontró la barra de búsqueda{X}")
-            return False
-
-        barra_busqueda.click()
-        time.sleep(0.5)
-        barra_busqueda.send_keys(Keys.CONTROL + "a")
-        barra_busqueda.send_keys(Keys.BACKSPACE)
-        time.sleep(0.5)
-
-        for caracter in nombre:
-            barra_busqueda.send_keys(caracter)
-            time.sleep(0.05)
-
+        url = f"https://www.facebook.com/search/people/?q={quote(nombre)}"
+        self.driver.get(url)
         time.sleep(float(self.config.get('tiempo_espera_busqueda_segundos', 5)))
         return True
 
-    def _encontrar_primer_resultado(self, nombre):
-        """Busca el primer resultado de tipo persona en el desplegable de búsqueda"""
-        selectores = [
-            f"//span[text()='{nombre}']/ancestor::a[1]",
-            f"//span[contains(text(), '{nombre}')]/ancestor::a[1]",
-            "//div[@role='listbox']//a[@role='link'][1]",
-        ]
-        for selector in selectores:
-            try:
-                elemento = self.driver.find_element(By.XPATH, selector)
-                return elemento
-            except NoSuchElementException:
-                continue
-        return None
+    def _encontrar_resultados(self, cantidad, timeout=10):
+        """Localiza hasta 'cantidad' links de foto de perfil de los primeros resultados (más estable que el nombre)"""
+        xpath = "//a[starts-with(@aria-label, 'Foto de perfil de')]"
+        try:
+            WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_element_located((By.XPATH, xpath))
+            )
+        except TimeoutException:
+            return []
 
-    def abrir_perfil(self, nombre):
-        """Hace clic en el primer resultado de búsqueda para abrir su perfil"""
-        resultado = self._encontrar_primer_resultado(nombre)
-        if not resultado:
-            print(f"   {R}❌ No se encontró ningún resultado para '{nombre}'{X}")
-            return False
+        elementos = self.driver.find_elements(By.XPATH, xpath)
+        hrefs = []
+        for elemento in elementos[:cantidad]:
+            href = elemento.get_attribute('href')
+            if href:
+                hrefs.append(href)
+        return hrefs
 
-        resultado.click()
+    def abrir_perfil_por_url(self, url_perfil):
+        """Navega directo a la URL del perfil"""
+        self.driver.get(url_perfil)
         time.sleep(4)
         print(f"   {V}✅ Perfil abierto{X}")
         return True
@@ -159,8 +147,6 @@ class LocalizadorFacebook:
         selectores = [
             "//div[@aria-label='Enviar mensaje']",
             "//div[@aria-label='Message']",
-            "//span[text()='Enviar mensaje']/ancestor::div[@role='button'][1]",
-            "//span[text()='Message']/ancestor::div[@role='button'][1]",
         ]
         for selector in selectores:
             try:
@@ -173,11 +159,12 @@ class LocalizadorFacebook:
         return None
 
     def _encontrar_campo_mensaje(self, timeout=10):
-        """Selector en cascada para el campo de texto del chat de Messenger"""
+        """Selector en cascada para el campo de texto del chat de Messenger (evita confundirse con otros composers de la página)"""
         selectores = [
+            "//div[@contenteditable='true'][starts-with(@aria-label, 'Escribe a')]",
+            "//div[@contenteditable='true'][starts-with(@aria-label, 'Write to')]",
             "//div[@aria-label='Mensaje' and @role='textbox']",
             "//div[@aria-label='Message' and @role='textbox']",
-            "//div[@contenteditable='true'][@role='textbox']",
         ]
         for selector in selectores:
             try:
@@ -196,7 +183,7 @@ class LocalizadorFacebook:
             print(f"   {R}❌ No se encontró el botón 'Enviar mensaje'{X}")
             return False
 
-        btn_mensaje.click()
+        self.driver.execute_script("arguments[0].click();", btn_mensaje)
         time.sleep(3)
 
         campo_mensaje = self._encontrar_campo_mensaje()
@@ -215,19 +202,41 @@ class LocalizadorFacebook:
         time.sleep(2)
 
         print(f"   {V}✅ Mensaje enviado{X}")
+        self._cerrar_chat_activo()
         return True
+
+    def _cerrar_chat_activo(self):
+        """Cierra la ventanita de chat de Messenger para que no obstruya el siguiente perfil"""
+        try:
+            btn_cerrar = self.driver.find_element(By.XPATH, "//div[@aria-label='Cerrar chat']")
+            self.driver.execute_script("arguments[0].click();", btn_cerrar)
+            time.sleep(1)
+        except NoSuchElementException:
+            pass
 
     # ==================== ORQUESTACIÓN ====================
 
-    def procesar_contacto(self, nombre, texto_mensaje):
-        """Ejecuta el flujo completo: buscar → abrir perfil → enviar mensaje"""
+    def procesar_contacto(self, nombre, texto_mensaje, cantidad_resultados=1):
+        """Ejecuta el flujo completo: buscar → obtener hasta X resultados → enviar mensaje a cada uno"""
         if not self.buscar_persona(nombre):
-            return False
+            return 0, 0
 
-        if not self.abrir_perfil(nombre):
-            return False
+        urls_perfiles = self._encontrar_resultados(cantidad_resultados)
+        if not urls_perfiles:
+            print(f"   {R}❌ No se encontró ningún resultado{X}")
+            return 0, 0
 
-        return self.enviar_mensaje(texto_mensaje)
+        print(f"   {C}📋 {len(urls_perfiles)} resultado(s) encontrado(s) para '{nombre}'{X}")
+
+        exitosos = 0
+        for i, url_perfil in enumerate(urls_perfiles):
+            print(f"\n   {N}➡️  Resultado {i + 1}/{len(urls_perfiles)}{X}")
+            if not self.abrir_perfil_por_url(url_perfil):
+                continue
+            if self.enviar_mensaje(texto_mensaje):
+                exitosos += 1
+
+        return exitosos, len(urls_perfiles)
 
     def cerrar_navegador(self):
         """Cierra el navegador"""

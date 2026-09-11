@@ -43,7 +43,10 @@ def main():
 
     exitosos = []
     fallidos = []
+    total_mensajes_enviados = 0
+    total_mensajes_intentados = 0
     tiempo_espera = int(config.get('tiempo_minimo_entre_envios_segundos', 10))
+    cantidad_resultados = int(config.get('cantidad_resultados_intentar', 1))
 
     for i, contacto in enumerate(contactos_validos):
         nombre = contacto['nombre']
@@ -54,10 +57,12 @@ def main():
             fallidos.append(nombre)
             continue
 
-        resultado = localizador.procesar_contacto(nombre, texto_mensaje)
+        enviados, encontrados = localizador.procesar_contacto(nombre, texto_mensaje, cantidad_resultados)
+        total_mensajes_enviados += enviados
+        total_mensajes_intentados += encontrados
 
-        if resultado:
-            exitosos.append(nombre)
+        if enviados > 0:
+            exitosos.append(f"{nombre} ({enviados}/{encontrados})")
         else:
             fallidos.append(nombre)
 
@@ -69,8 +74,9 @@ def main():
     print(f"\n{N}{'='*70}{X}")
     print(f"{N}                    📋 RESUMEN{X}")
     print(f"{N}{'='*70}{X}")
-    print(f"{V}✅ Exitosos: {len(exitosos)}{X} {exitosos}")
-    print(f"{R}❌ Fallidos: {len(fallidos)}{X} {fallidos}")
+    print(f"{C}📨 Mensajes enviados: {total_mensajes_enviados}/{total_mensajes_intentados}{X}")
+    print(f"{V}✅ Contactos con al menos 1 envío: {len(exitosos)}{X} {exitosos}")
+    print(f"{R}❌ Contactos sin ningún envío: {len(fallidos)}{X} {fallidos}")
     print(f"{N}{'='*70}{X}")
 
 
