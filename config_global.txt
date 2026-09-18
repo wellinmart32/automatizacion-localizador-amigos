@@ -8,7 +8,10 @@ carpeta_perfil_custom = perfiles/localizador_amigos
 
 [BUSQUEDA]
 tiempo_espera_busqueda_segundos = 5
-cantidad_resultados_intentar = 1
+cantidad_resultados_intentar = 5
+
+[HISTORIAL]
+carpeta_historial = historial_envios.json
 
 [LIMITES]
 tiempo_minimo_entre_envios_segundos = 10

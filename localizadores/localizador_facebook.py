@@ -115,22 +115,62 @@ class LocalizadorFacebook:
         time.sleep(float(self.config.get('tiempo_espera_busqueda_segundos', 5)))
         return True
 
-    def _encontrar_resultados(self, cantidad, timeout=10):
-        """Localiza hasta 'cantidad' links de foto de perfil de los primeros resultados (más estable que el nombre)"""
-        xpath = "//a[starts-with(@aria-label, 'Foto de perfil de')]"
+    def _obtener_texto_ubicacion(self, articulo):
+        """Busca directamente el texto 'Vive en X' dentro de la tarjeta, sin depender de clases CSS frágiles"""
+        try:
+            elementos = articulo.find_elements(By.XPATH, ".//*[contains(text(), 'Vive en')]")
+            return " ".join(e.text for e in elementos if e.text)
+        except Exception:
+            return ""
+
+    def _encontrar_resultados(self, cantidad, timeout=10, filtro_amistad='todos', evitar_duplicados=False, urls_ya_enviadas=None, ubicacion=''):
+        """Localiza hasta 'cantidad' resultados, filtrando por amistad, duplicados y/o ubicación si se indica"""
+        if urls_ya_enviadas is None:
+            urls_ya_enviadas = []
+
+        xpath_articulos = "//div[@role='feed']//div[@role='article']"
         try:
             WebDriverWait(self.driver, timeout).until(
-                EC.presence_of_element_located((By.XPATH, xpath))
+                EC.presence_of_element_located((By.XPATH, xpath_articulos))
             )
         except TimeoutException:
             return []
 
-        elementos = self.driver.find_elements(By.XPATH, xpath)
+        articulos = self.driver.find_elements(By.XPATH, xpath_articulos)
         hrefs = []
-        for elemento in elementos[:cantidad]:
-            href = elemento.get_attribute('href')
-            if href:
-                hrefs.append(href)
+
+        for articulo in articulos:
+            try:
+                link_foto = articulo.find_element(By.XPATH, ".//a[starts-with(@aria-label, 'Foto de perfil de')]")
+                href = link_foto.get_attribute('href')
+            except NoSuchElementException:
+                continue
+
+            if not href:
+                continue
+
+            if evitar_duplicados and href in urls_ya_enviadas:
+                continue
+
+            es_amigo = len(articulo.find_elements(By.XPATH, ".//div[@aria-label='Enviar mensaje']")) > 0
+
+            if filtro_amistad == 'amigos' and not es_amigo:
+                continue
+            if filtro_amistad == 'no_amigos' and es_amigo:
+                continue
+
+            tiene_ubicacion_en_tarjeta = False
+            if ubicacion:
+                texto_ubicacion = self._obtener_texto_ubicacion(articulo)
+                tiene_ubicacion_en_tarjeta = 'Vive en' in texto_ubicacion or 'vive en' in texto_ubicacion.lower()
+                if tiene_ubicacion_en_tarjeta and ubicacion.lower() not in texto_ubicacion.lower():
+                    continue
+
+            hrefs.append((href, tiene_ubicacion_en_tarjeta))
+
+            if len(hrefs) >= cantidad:
+                break
+
         return hrefs
 
     def abrir_perfil_por_url(self, url_perfil):
@@ -158,7 +198,7 @@ class LocalizadorFacebook:
                 continue
         return None
 
-    def _encontrar_campo_mensaje(self, timeout=10):
+    def _encontrar_campo_mensaje(self, timeout=3):
         """Selector en cascada para el campo de texto del chat de Messenger (evita confundirse con otros composers de la página)"""
         selectores = [
             "//div[@contenteditable='true'][starts-with(@aria-label, 'Escribe a')]",
@@ -176,6 +216,39 @@ class LocalizadorFacebook:
                 continue
         return None
 
+    def _chat_bloqueado(self):
+        """Detecta si Facebook muestra algún mensaje de bloqueo de envío a esta cuenta"""
+        frases_bloqueo = [
+            'No puedes enviar mensajes a esta cuenta',
+            'todavía no puede acceder a este chat',
+        ]
+        for frase in frases_bloqueo:
+            try:
+                self.driver.find_element(By.XPATH, f"//*[contains(text(), '{frase}')]")
+                return True
+            except NoSuchElementException:
+                continue
+        return False
+
+    def _perfil_tiene_otra_ubicacion(self, ubicacion):
+        """Revisa la sección de Detalles del perfil completo buscando pistas de ubicación distintas a la buscada"""
+        try:
+            elementos = self.driver.find_elements(
+                By.XPATH,
+                "//*[contains(text(), 'Vive en') or contains(text(), 'Estudió en') or contains(text(), 'Ha trabajado en') or contains(text(), 'Ha ido a')]"
+            )
+        except Exception:
+            return False
+
+        for elemento in elementos:
+            texto = elemento.text
+            if not texto:
+                continue
+            if ubicacion.lower() not in texto.lower():
+                return True
+
+        return False
+
     def enviar_mensaje(self, texto):
         """Abre el chat de Messenger desde el perfil y envía el mensaje"""
         btn_mensaje = self._encontrar_boton_mensaje()
@@ -186,9 +259,15 @@ class LocalizadorFacebook:
         self.driver.execute_script("arguments[0].click();", btn_mensaje)
         time.sleep(3)
 
+        if self._chat_bloqueado():
+            print(f"   {A}⚠️  Facebook bloqueó el envío a esta cuenta{X}")
+            self._cerrar_chat_activo()
+            return False
+
         campo_mensaje = self._encontrar_campo_mensaje()
         if not campo_mensaje:
             print(f"   {R}❌ No se encontró el campo de texto del chat{X}")
+            self._cerrar_chat_activo()
             return False
 
         campo_mensaje.click()
@@ -216,27 +295,41 @@ class LocalizadorFacebook:
 
     # ==================== ORQUESTACIÓN ====================
 
-    def procesar_contacto(self, nombre, texto_mensaje, cantidad_resultados=1):
+    def procesar_contacto(self, nombre, texto_mensaje, cantidad_resultados=1, filtro_amistad='todos', evitar_duplicados=False, urls_ya_enviadas=None, ubicacion=''):
         """Ejecuta el flujo completo: buscar → obtener hasta X resultados → enviar mensaje a cada uno"""
         if not self.buscar_persona(nombre):
-            return 0, 0
+            return 0, 0, []
 
-        urls_perfiles = self._encontrar_resultados(cantidad_resultados)
-        if not urls_perfiles:
-            print(f"   {R}❌ No se encontró ningún resultado{X}")
-            return 0, 0
+        resultados = self._encontrar_resultados(
+            cantidad_resultados,
+            filtro_amistad=filtro_amistad,
+            evitar_duplicados=evitar_duplicados,
+            urls_ya_enviadas=urls_ya_enviadas,
+            ubicacion=ubicacion
+        )
+        if not resultados:
+            print(f"   {R}❌ No se encontró ningún resultado nuevo{X}")
+            return 0, 0, []
 
-        print(f"   {C}📋 {len(urls_perfiles)} resultado(s) encontrado(s) para '{nombre}'{X}")
+        print(f"   {C}📋 {len(resultados)} resultado(s) encontrado(s) para '{nombre}'{X}")
 
         exitosos = 0
-        for i, url_perfil in enumerate(urls_perfiles):
-            print(f"\n   {N}➡️  Resultado {i + 1}/{len(urls_perfiles)}{X}")
+        urls_enviadas_ahora = []
+        for i, (url_perfil, tiene_ubicacion) in enumerate(resultados):
+            print(f"\n   {N}➡️  Resultado {i + 1}/{len(resultados)}{X}")
             if not self.abrir_perfil_por_url(url_perfil):
                 continue
+
+            if ubicacion and not tiene_ubicacion:
+                if self._perfil_tiene_otra_ubicacion(ubicacion):
+                    print(f"   {A}⚠️  Detalles del perfil sugieren otra ubicación, se descarta{X}")
+                    continue
+
             if self.enviar_mensaje(texto_mensaje):
                 exitosos += 1
+                urls_enviadas_ahora.append(url_perfil)
 
-        return exitosos, len(urls_perfiles)
+        return exitosos, len(resultados), urls_enviadas_ahora
 
     def cerrar_navegador(self):
         """Cierra el navegador"""

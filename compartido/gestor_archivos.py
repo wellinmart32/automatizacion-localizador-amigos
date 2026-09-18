@@ -29,7 +29,8 @@ def leer_config_global():
         'tiempo_minimo_entre_envios_segundos': '10',
         'cantidad_resultados_intentar': '1',
         'carpeta_contactos': 'contactos.json',
-        'carpeta_mensajes': 'mensajes'
+        'carpeta_mensajes': 'mensajes',
+        'carpeta_historial': 'historial_envios.json'
     }
 
     if not os.path.exists(archivo_config):
@@ -47,6 +48,9 @@ def leer_config_global():
     if config.has_section('BUSQUEDA'):
         resultado['tiempo_espera_busqueda_segundos'] = config.get('BUSQUEDA', 'tiempo_espera_busqueda_segundos', fallback=resultado['tiempo_espera_busqueda_segundos'])
         resultado['cantidad_resultados_intentar'] = config.get('BUSQUEDA', 'cantidad_resultados_intentar', fallback=resultado['cantidad_resultados_intentar'])
+
+    if config.has_section('HISTORIAL'):
+        resultado['carpeta_historial'] = config.get('HISTORIAL', 'carpeta_historial', fallback=resultado['carpeta_historial'])
 
     if config.has_section('LIMITES'):
         resultado['tiempo_minimo_entre_envios_segundos'] = config.get('LIMITES', 'tiempo_minimo_entre_envios_segundos', fallback=resultado['tiempo_minimo_entre_envios_segundos'])
@@ -130,6 +134,52 @@ def obtener_estadisticas_contactos():
         'con_mensaje_asignado': len(con_mensaje),
         'sin_mensaje_asignado': len(contactos) - len(con_mensaje)
     }
+
+
+def leer_historial_envios():
+    """
+    Lee el historial de envíos (URLs de perfiles a los que ya se les envió mensaje)
+
+    Returns:
+        list: lista de URLs de perfiles, o lista vacía si no existe el archivo
+    """
+    config = leer_config_global()
+    archivo_historial = os.path.join(_base_dir(), config['carpeta_historial'])
+
+    if not os.path.exists(archivo_historial):
+        return []
+
+    try:
+        with open(archivo_historial, 'r', encoding='utf-8') as f:
+            datos = json.load(f)
+        return datos.get('urls_enviados', [])
+    except Exception as e:
+        print(f"❌ Error leyendo historial de envíos: {e}")
+        return []
+
+
+def agregar_url_a_historial(url_perfil):
+    """
+    Agrega una URL de perfil al historial de envíos (evita duplicados en el archivo)
+
+    Args:
+        url_perfil: URL del perfil al que se le envió mensaje
+    """
+    config = leer_config_global()
+    archivo_historial = os.path.join(_base_dir(), config['carpeta_historial'])
+
+    urls = leer_historial_envios()
+
+    if url_perfil in urls:
+        return
+
+    urls.append(url_perfil)
+
+    try:
+        with open(archivo_historial, 'w', encoding='utf-8') as f:
+            json.dump({'urls_enviados': urls}, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"❌ Error guardando historial de envíos: {e}")
 
 
 def obtener_carpeta_perfil_firefox():
