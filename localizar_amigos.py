@@ -1,6 +1,6 @@
 import time
 
-from compartido.gestor_archivos import leer_config_global, leer_contactos, leer_mensaje, obtener_estadisticas_contactos, leer_historial_envios, agregar_url_a_historial
+from compartido.gestor_archivos import leer_config_global, leer_contactos, leer_mensaje, obtener_estadisticas_contactos, leer_historial_envios, agregar_url_a_historial, obtener_urls_historial
 from localizadores.localizador_facebook import LocalizadorFacebook
 
 # ── Colores ANSI ──────────────────────────────────────────────
@@ -47,7 +47,8 @@ def main():
     total_mensajes_intentados = 0
     tiempo_espera = int(config.get('tiempo_minimo_entre_envios_segundos', 10))
     cantidad_resultados = int(config.get('cantidad_resultados_intentar', 1))
-    urls_ya_enviadas = leer_historial_envios()
+    historial = leer_historial_envios()
+    urls_ya_enviadas = obtener_urls_historial(historial)
 
     for i, contacto in enumerate(contactos_validos):
         nombre = contacto['nombre']
@@ -62,16 +63,16 @@ def main():
         evitar_duplicados = contacto.get('evitar_duplicados', False)
         ubicacion = contacto.get('ubicacion', '')
 
-        enviados, encontrados, urls_enviadas_ahora = localizador.procesar_contacto(
+        enviados, encontrados, enviados_ahora, bloqueados_ahora = localizador.procesar_contacto(
             nombre, texto_mensaje, cantidad_resultados, filtro_amistad,
             evitar_duplicados, urls_ya_enviadas, ubicacion
         )
         total_mensajes_enviados += enviados
         total_mensajes_intentados += encontrados
 
-        for url in urls_enviadas_ahora:
-            agregar_url_a_historial(url)
-            urls_ya_enviadas.append(url)
+        for item in enviados_ahora + bloqueados_ahora:
+            agregar_url_a_historial(item['nombre'], item['url'])
+            urls_ya_enviadas.append(item['url'])
 
         if enviados > 0:
             exitosos.append(f"{nombre} ({enviados}/{encontrados})")

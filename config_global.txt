@@ -13,5 +13,9 @@ cantidad_resultados_intentar = 5
 [HISTORIAL]
 carpeta_historial = historial_envios.json
 
+[REVISOR_RESPUESTAS]
+modo = no_vistos
+cantidad_maxima = 10
+
 [LIMITES]
 tiempo_minimo_entre_envios_segundos = 10
