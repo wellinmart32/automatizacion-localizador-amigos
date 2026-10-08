@@ -5,6 +5,9 @@
 # Perfiles del navegador (contienen sesiones)
 perfiles/
 
+# Historial de envíos (contiene URLs de personas contactadas)
+historial_envios.json
+
 # Instalador compilado (binario grande, se regenera)
 installer_output/
 
